@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b5bd6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="本地制作版">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Gamma Pulse: 40Hz调幅音乐</title>
+<style>
+  :root{--bg:#f6f7fb;--card:#fff;--ink:#1c2333;--ink2:#5a6478;--line:#e4e7ef;
+        --accent:#5b5bd6;--ok:#2e9e6b;--radius:14px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.6;padding-bottom:26px;}
+  header{background:linear-gradient(135deg,#5b5bd6,#8b5bd6 60%,#c05bd6);color:#fff;
+         padding:26px 18px 22px;text-align:center;}
+  header h1{font-size:23px;font-weight:700;letter-spacing:.5px;}
+  header p{font-size:13px;opacity:.92;margin-top:5px;}
+  .shareline{margin-top:13px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;}
+  .shareline span{font-size:12px;opacity:.9;}
+  main{max-width:860px;margin:0 auto;padding:20px 14px 0;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+        padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 3px rgba(28,35,51,.05);}
+  .card h2{font-size:16px;margin-bottom:9px;}
+  .sub{font-size:12.5px;color:var(--ink2);margin-bottom:10px;}
+  .dropzone{display:block;border:2px dashed #c3c8da;border-radius:12px;padding:26px 14px;
+    text-align:center;color:var(--ink2);cursor:pointer;font-size:14px;}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:#f4f4ff;color:var(--accent);}
+  .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:0;opacity:0;overflow:hidden;border:0;}
+  /* 唯一入口是上方 label[for=fileInput]；input 本体移出屏幕但不用 display:none
+     （部分 iOS/安卓对 display:none 的隐藏框不弹选择，移出屏幕最稳） */
+  .pickbtn{position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0;}
+  .row{display:flex;flex-wrap:wrap;gap:12px 22px;margin-top:12px;align-items:flex-end;}
+  .ctrl{flex:1 1 220px;min-width:190px;}
+  .ctrl label{display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin-bottom:4px;}
+  .ctrl label b{color:var(--ink);font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  .checkline{font-size:12.5px;color:var(--ink2);display:flex;gap:7px;align-items:center;cursor:pointer;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;cursor:pointer;
+    border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;transition:.15s;}
+  .btn.primary{background:var(--accent);color:#fff;}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink);}
+  .btn.ghost:hover{border-color:var(--accent);color:var(--accent);}
+  .btn.green{background:var(--ok);color:#fff;}
+  .btn.preset{background:#fff3d6;color:#8a5b00;border:1px solid #f0d08a;}
+  /* 场景卡 */
+  .scenes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .scene{border:1px solid var(--line);border-radius:10px;background:#fafbff;padding:10px 6px;text-align:center;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:border-color .15s, background .15s;}
+  .scene b{display:block;font-size:13.5px;color:var(--ink);margin-top:3px;}
+  .scene .sd{display:block;font-size:11.5px;color:var(--ink2);margin-top:3px;line-height:1.4;}
+  .scene:hover{border-color:#8b8bd6;}
+  .scene.on{border-color:#8b8bd6;background:#eef0ff;}
+  @media(max-width:640px){ .scenes{grid-template-columns:repeat(2,1fr);} }
+  .reflist{margin:6px 0 0;padding-left:20px;font-size:12.5px;color:var(--ink2);line-height:1.65;}
+  .reflist li{margin-bottom:8px;}
+  .reflist a{color:#4a5ac7;word-break:break-all;}
+  .warnbox{border-color:#f0c9a0;background:#fffaf3;}
+  .dislist{margin:6px 0 0;padding-left:20px;font-size:12.5px;color:#6b5a3e;line-height:1.7;}
+  .btn.tiny{padding:5px 10px;font-size:12px;font-weight:500;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btnrow{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px;align-items:center;}
+  .status{font-size:12.5px;color:var(--ink2);min-height:18px;}
+  canvas.wave{width:100%;height:96px;background:#f4f5fa;border:1px solid var(--line);border-radius:10px;display:block;}
+  .trackhead{display:flex;justify-content:space-between;align-items:center;margin:12px 0 5px;}
+  .trackhead .tname{font-size:13.5px;font-weight:600;}
+  .trackhead .tdur{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;}
+  .modebar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:12.5px;
+    background:#f6f4ff;padding:9px 12px;border-radius:10px;margin-bottom:10px;}
+  .modebar label{display:flex;gap:5px;align-items:center;cursor:pointer;}
+  .librow{display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line);}
+  .librow.active{background:#fafaff;}
+  .libbody{flex:1;min-width:0;}
+  .libtitle{font-size:13.5px;font-weight:600;word-break:break-all;}
+  .libtitle .tag{font-size:11px;font-weight:500;color:var(--accent);background:#f0f0ff;
+    padding:1px 7px;border-radius:10px;margin-left:6px;}
+  .libmeta{font-size:11.5px;color:var(--ink2);margin:2px 0 5px;word-break:break-all;}
+  .prog{height:5px;background:#e9ebf3;border-radius:4px;overflow:hidden;}
+  .progfill{height:100%;width:0;background:var(--accent);border-radius:4px;}
+  .libacts{display:flex;flex-direction:column;gap:5px;}
+  .empty{font-size:13px;color:var(--ink2);padding:16px 0;text-align:center;}
+  .mobbar{border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.6;
+    background:#fff4e5;border:1px solid #f2d19b;color:#8a5b00;margin-bottom:12px;}
+  .hidden{display:none!important;}
+  footer{text-align:center;font-size:11.5px;color:var(--ink2);margin-top:8px;}
+  @media (max-width:640px){
+    header{padding:18px 13px 16px;} header h1{font-size:19px;}
+    main{padding:12px 10px 0;} .card{padding:14px 12px;margin-bottom:11px;border-radius:12px;}
+    .card h2{font-size:15px;} .dropzone{padding:20px 10px;font-size:13.5px;}
+    .ctrl{flex:1 1 100%;min-width:0;} .btn{font-size:13.5px;padding:11px 12px;min-height:44px;}
+    .btn.tiny{min-height:36px;padding:6px 10px;} .btnrow .btn{flex:1 1 auto;}
+    .btnrow .status{flex:1 1 100%;} input[type=range]{height:34px;}
+    canvas.wave{height:80px;} .librow{flex-direction:column;gap:7px;}
+    .libacts{flex-direction:row;flex-wrap:wrap;} .shareline span{flex:1 1 100%;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎵 Gamma Pulse: 40Hz调幅音乐</h1>
+  <p>40Hz 正弦包络振幅调制 · 从本机选歌，本机试听与导出</p>
+  <div class="shareline">
+    <button type="button" class="btn ghost" id="copyLink">📋 复制本页链接</button>
+    <span>发给别人后，对方在自己设备上选歌；各自歌库独立，不上传服务器。</span>
+  </div>
+</header>
+
+<main>
+  <div class="mobbar hidden" id="inappBar"></div>
+
+  <section class="card">
+    <h2>① 选歌与调制</h2>
+    <label class="dropzone" id="dropzone" for="fileInput">📱 点这里从本机选歌（能多选就一次多选；选不了多首就一首一首选，会自动累计）</label>
+    <input type="file" id="fileInput" data-song="1" class="pickbtn" multiple
+           accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg,.aac,.mp4">
+    <div class="status" id="uploadDiag" style="margin-top:7px">选好歌后自动生成 40Hz 调制版；一次选多首会依次导入歌库。</div>
+
+    <div class="row">
+      <div class="ctrl" style="flex:1 1 100%">
+        <label class="checkline" style="margin:0"><input type="checkbox" id="liteMode"> 手机省内存（单声道 22.05kHz）</label>
+        <div class="status" id="liteHint" style="margin-top:4px"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="ctrl">
+        <label>调制频率 <b><span id="fModVal">40</span> Hz</b></label>
+        <input type="range" id="fMod" min="1" max="100" step="1" value="40">
+      </div>
+      <div class="ctrl">
+        <label>调制深度 <b><span id="depthVal">28</span> %</b></label>
+        <input type="range" id="depth" min="5" max="60" step="0.5" value="28">
+      </div>
+      <div class="ctrl" style="flex:0 0 auto;min-width:0">
+        <button type="button" class="btn preset" id="presetBtn">⚡ 一键 40Hz + 28%</button>
+      </div>
+    </div>
+
+    <div class="trackhead"><span class="tname">原曲</span><span class="tdur" id="origDur">—</span></div>
+    <canvas class="wave" id="waveOrig"></canvas>
+    <div class="trackhead"><span class="tname">40Hz 调制版</span><span class="tdur" id="modDur">—</span></div>
+    <canvas class="wave" id="waveMod"></canvas>
+    <div class="btnrow">
+      <button type="button" class="btn primary" id="playOrig" disabled>▶ 试听原曲</button>
+      <button type="button" class="btn primary" id="playMod" disabled>▶ 试听调制版</button>
+      <button type="button" class="btn ghost" id="saveLib" disabled>💾 存入歌库</button>
+      <button type="button" class="btn green" id="dlMod" disabled>⬇ 导出 WAV</button>
+      <button type="button" class="btn ghost hidden" id="shareMod">📤 系统分享</button>
+      <span class="status" id="songStatus"></span>
+    </div>
+  </section>
+
+  <section class="card" id="scenes">
+    <h2>🎯 场景一键设定 <span class="status" style="font-weight:400">点卡片即按该场景调好参数</span></h2>
+    <div class="scenes">
+      <div class="scene" data-depth="28" data-label="专注工作" tabindex="0">
+        <span style="font-size:20px">🎯</span><b>专注工作</b>
+        <span class="sd">40Hz / 28%<br>默认推荐，中低音量</span>
+      </div>
+      <div class="scene" data-depth="24" data-label="深度阅读" tabindex="0">
+        <span style="font-size:20px">📖</span><b>深度阅读</b>
+        <span class="sd">40Hz / 24%<br>调制更柔和，适合长时间</span>
+      </div>
+      <div class="scene" data-depth="35" data-label="瑜伽冥想" tabindex="0">
+        <span style="font-size:20px">🧘</span><b>瑜伽冥想</b>
+        <span class="sd">40Hz / 35%<br>节律感更明显，配合慢呼吸</span>
+      </div>
+      <div class="scene" data-depth="45" data-label="长途驾驶提神" tabindex="0">
+        <span style="font-size:20px">🚗</span><b>长途驾驶提神</b>
+        <span class="sd">40Hz / 45%<br>⚠️ 仅停车休息时收听，行驶中勿用</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="library">
+    <h2>② 我的歌库 <span class="status" id="libCount" style="font-weight:400"></span></h2>
+    <div class="sub">保存或导出的歌都在这里，点 ▶ 直接试听。</div>
+    <div class="modebar">
+      <label><input type="radio" name="libMode" value="20" checked> 最多 20 首（刷新后仍在）</label>
+      <label><input type="radio" name="libMode" value="mem"> 不限数量（仅本次页面）</label>
+    </div>
+    <div class="btnrow" style="margin-top:0;margin-bottom:6px">
+      <button type="button" class="btn primary tiny" id="libPlayAll">▶ 播放全部</button>
+      <button type="button" class="btn ghost tiny" id="libStopAll">⏹ 停止播放</button>
+      <button type="button" class="btn ghost tiny" id="libClear">🗑 清空歌库</button>
+      <span class="status" id="libStatus"></span>
+    </div>
+    <div id="libraryBody"></div>
+  </section>
+
+  <section class="card" id="refs">
+    <h2>③ 参考文献与研究依据</h2>
+    <div class="sub">40Hz 伽马刺激的主要研究脉络（本工具的参数设定以此为参考）：</div>
+    <ol class="reflist">
+      <li>Iaccarino HF, Singer AC, Martorell AJ, Rudenko A, Gao F, Gillingham TZ, …, Tsai LH.
+        <b>Gamma frequency entrainment attenuates amyloid load and modifies microglia.</b>
+        <i>Nature</i>, 540(7632): 230–235, 2016.
+        —— MIT 蔡立慧（Li-Huei Tsai）实验室小鼠实验：40Hz 光/声刺激可诱发伽马振荡，降低 Aβ 水平、激活小胶质细胞。
+        <a href="https://pubmed.ncbi.nlm.nih.gov/27929004/" target="_blank" rel="noopener">pubmed.ncbi.nlm.nih.gov/27929004</a>
+      </li>
+      <li>MIT News（2016-12-07）：<i>Unique visual stimulation may be new treatment for Alzheimer's</i>.
+        —— 上述研究的官方报道与机制解读。
+        <a href="https://news.mit.edu/2016/visual-stimulation-treatment-alzheimer-1207" target="_blank" rel="noopener">news.mit.edu/2016/visual-stimulation-treatment-alzheimer-1207</a>
+      </li>
+    </ol>
+    <div class="status" style="margin-top:8px">说明：以上多为动物实验与机制研究，40Hz 声刺激对人的长期效果仍在临床验证中。本页面仅把 40Hz 调幅作为音频制作参数呈现，不代表任何疗效承诺。</div>
+  </section>
+
+  <section class="card warnbox" id="disclaimer">
+    <h2>⚠️ 重要免责说明</h2>
+    <ul class="dislist">
+      <li>本页面是一款<b>个人音频制作与播放工具</b>，仅供专注、放松、学习与日常娱乐使用；<b>不构成医疗建议</b>，不用于诊断、治疗、缓解或预防任何疾病，请勿以此替代正规诊疗。</li>
+      <li>40Hz 相关研究的多数证据来自<b>动物实验与早期临床研究</b>；对人的长期效果尚未确定，请理性看待。</li>
+      <li>如你正在接受治疗，或患有<b>癫痫、光敏性疾病</b>，或佩戴心脏起搏器等植入设备，或处于孕期，请先咨询医生再使用。</li>
+      <li>使用中若出现<b>头晕、头痛、耳鸣加重、恶心、心慌或任何不适，请立即停止使用</b>并休息；症状持续请及时就医。</li>
+      <li>「长途驾驶提神」场景<b>仅建议在停车休息时收听</b>；驾驶或操作机械时请勿佩戴耳机收听。</li>
+      <li>请使用<b>中低音量</b>，连续收听不宜过长，注意保护听力。</li>
+    </ul>
+  </section>
+
+  <footer>Gamma Pulse · 40Hz调幅音乐 · 建议耳机、中低音量，不适即停，不用于医疗</footer>
+</main>
+
+<script>
+"use strict";
+/* ============ 基础 ============ */
+const AC = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function getCtx(){
+  if(!AC) throw new Error("当前浏览器不支持 AudioContext，请用 Safari / 系统浏览器打开本页");
+  if(!audioCtx) audioCtx = new AC();
+  if(audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+const $ = id => document.getElementById(id);
+const TWO_PI = Math.PI * 2;
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+const fmtDur = sec => { const m=Math.floor(sec/60), s=Math.round(sec%60); return m+":"+String(s).padStart(2,"0"); };
+const fmtSize = b => b > 1048576 ? (b/1048576).toFixed(1)+" MB" : Math.round(b/1024)+" KB";
+const UA = navigator.userAgent || "";
+const IS_ANDROID = /Android/i.test(UA);
+function detectInApp(){
+  if(/MicroMessenger/i.test(UA)) return "微信";
+  if(/MQQBrowser|QQ\//i.test(UA)) return "QQ";
+  if(/BingWeb|BingApp|Microsoft/i.test(UA)) return "必应";
+  if(/; wv\)/.test(UA)) return "内置浏览器";   /* 安卓 WebView 标记，多为 App 内嵌或手机自带浏览器 */
+  return "";
+}
+const ENV = {
+  wechat:/MicroMessenger/i.test(UA),
+  quark:/Quark|UCBrowser/i.test(UA),          /* 夸克系浏览器：文件分享调不起来 */
+  mobile:/Android|iPhone|iPad|iPod|Mobile/i.test(UA),
+  inapp: !!detectInApp(),
+  inappName: detectInApp(),
+  shareApi:!!(navigator.share && navigator.canShare)
+};
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    const ta=document.createElement("textarea"); ta.value=t;
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); }catch(e2){}
+    ta.remove(); return true;
+  }
+}
+function pageUrl(){ return location.href.split("#")[0]; }
+
+/* ============ 参数与一键预设 ============ */
+function syncLabels(){
+  $("fModVal").textContent = $("fMod").value;
+  $("depthVal").textContent = parseFloat($("depth").value);
+}
+$("fMod").addEventListener("input", syncLabels);
+$("depth").addEventListener("input", syncLabels);
+$("fMod").addEventListener("change", rendMod);
+$("depth").addEventListener("change", rendMod);
+$("presetBtn").onclick = () => {
+  $("fMod").value = 40; $("depth").value = 28;
+  syncLabels(); rendMod();
+  $("songStatus").textContent = "⚡ 已设为 40Hz / 深度 28%";
+};
+/* 场景卡：一键切换到对应场景参数（统一 40Hz，深度不同） */
+document.querySelectorAll(".scene").forEach(el => {
+  const act = () => {
+    document.querySelectorAll(".scene").forEach(s=>s.classList.remove("on"));
+    el.classList.add("on");
+    $("fMod").value = 40;
+    $("depth").value = el.dataset.depth;
+    syncLabels(); rendMod();
+    $("songStatus").textContent = "🎯 "+el.dataset.label+"：已设为 40Hz / 深度 "+el.dataset.depth+
+      (origBuffer ? "%，正在重新调制" : "%。选歌后将按此参数调制");
+  };
+  el.addEventListener("click", act);
+  el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); act(); } });
+});
+syncLabels();
+
+/* ============ 波形 ============ */
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || 600, h = cv.clientHeight || 96;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  return {g,w,h};
+}
+function drawWave(cv, buffer, playRatio){
+  if(!buffer) return;
+  const {g,w,h} = setupCanvas(cv);
+  g.clearRect(0,0,w,h);
+  const data = buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(data.length / w)), mid = h/2;
+  g.strokeStyle = "#d7dbe8"; g.beginPath(); g.moveTo(0,mid); g.lineTo(w,mid); g.stroke();
+  g.fillStyle = "#8b8bd6";
+  for(let x=0;x<w;x++){
+    let min=1, max=-1;
+    const s0=x*step, s1=Math.min(data.length,s0+step);
+    for(let i=s0;i<s1;i++){ const v=data[i]; if(v<min)min=v; if(v>max)max=v; }
+    if(min>max){min=0;max=0;}
+    const y1=mid-max*(mid-4), y2=mid-min*(mid-4);
+    g.fillRect(x,y1,1,Math.max(1,y2-y1));
+  }
+  if(playRatio != null && playRatio >= 0){
+    g.fillStyle="rgba(91,91,214,.18)"; g.fillRect(0,0,w*playRatio,h);
+    g.fillStyle="#5b5bd6"; g.fillRect(w*playRatio-1,0,2,h);
+  }
+}
+window.addEventListener("resize", () => {
+  if(origBuffer) drawWave($("waveOrig"), origBuffer, null);
+  if(modBuffer)  drawWave($("waveMod"), modBuffer, null);
+});
+
+/* ============ 播放（试听与歌库共用） ============ */
+let cur = null, playAll = null;
+function stopPlayAll(){
+  if(!playAll) return;
+  playAll = null;
+  const b = $("libPlayAll");
+  b.textContent = "▶ 播放全部";
+  b.classList.remove("green");
+}
+/* 用户主动停止 / 切换时统一调用；playBuffer 内部换曲只用 stopPlayback，不会中断连播 */
+function userStop(){ stopPlayAll(); stopPlayback(); }
+function syncLibButtons(){
+  document.querySelectorAll("#libraryBody [data-play]").forEach(b => {
+    const on = !!(cur && cur.libId === b.dataset.play);
+    b.textContent = on ? "⏸ 停止" : "▶ 试听";
+    document.querySelectorAll("#libraryBody .librow").forEach(r =>
+      r.classList.toggle("active", !!(cur && cur.libId === r.dataset.row)));
+  });
+  document.querySelectorAll("#libraryBody [data-prog]").forEach(p => {
+    if(!cur || cur.libId !== p.dataset.prog) p.style.width = "0%";
+  });
+}
+function stopPlayback(){
+  if(cur){
+    try{ cur.src.onended = null; cur.src.stop(); }catch(e){}
+    if(cur.canvas) drawWave(cur.canvas, cur.buffer, null);
+    if(cur.btn) cur.btn.textContent = cur.label;
+    cur = null;
+  }
+  syncLibButtons();
+}
+function playBuffer(buffer, canvas, btn, label, libId, opts){
+  stopPlayback();
+  const src = getCtx().createBufferSource();
+  src.buffer = buffer;
+  const g = getCtx().createGain(); g.gain.value = 0.9;
+  src.connect(g).connect(getCtx().destination);
+  const startedAt = getCtx().currentTime + 0.03;
+  src.start(startedAt);
+  cur = {src, buffer, startedAt, canvas, btn, label, libId:libId||null,
+         onEnded:opts && opts.onEnded};
+  if(btn) btn.textContent = "⏸ 停止";
+  syncLibButtons();
+  src.onended = () => {
+    if(cur && cur.src === src){
+      const wasLib = !!cur.libId, end = cur.onEnded;
+      if(canvas) drawWave(canvas, buffer, null);
+      if(btn) btn.textContent = label;
+      cur = null; syncLibButtons();
+      if(end) end();
+      else if(wasLib) $("libStatus").textContent = "⏹ 播放结束";
+    }
+  };
+  tick();
+}
+function togglePlay(buffer, canvas, btn, label){
+  stopPlayAll();
+  if(cur && cur.src && cur.buffer === buffer){ stopPlayback(); return; }
+  playBuffer(buffer, canvas, btn, label);
+}
+function tick(){
+  if(!cur) return;
+  const ratio = Math.min(1, (getCtx().currentTime - cur.startedAt) / cur.buffer.duration);
+  if(cur.canvas) drawWave(cur.canvas, cur.buffer, ratio);
+  if(cur.libId){
+    const p = document.querySelector('#libraryBody [data-prog="' + cur.libId + '"]');
+    if(p) p.style.width = (ratio*100).toFixed(1) + "%";
+  }
+  if(ratio < 1) requestAnimationFrame(tick);
+}
+
+/* ============ 40Hz 正弦包络调制 ============ */
+function modulateBuffer(srcBuf, fMod, depth){
+  const sr=srcBuf.sampleRate, len=srcBuf.length, chs=srcBuf.numberOfChannels;
+  const w = TWO_PI*fMod/sr, outChs=[];
+  let peak = 0;
+  for(let c=0;c<chs;c++){
+    const src=srcBuf.getChannelData(c), out=new Float32Array(len);
+    for(let i=0;i<len;i++){
+      const v = src[i]*(1+depth*Math.sin(w*i));
+      out[i]=v; const a=v<0?-v:v; if(a>peak) peak=a;
+    }
+    outChs.push(out);
+  }
+  const norm = peak>0 ? 0.98/peak : 1;
+  const outBuf = getCtx().createBuffer(chs,len,sr);
+  for(let c=0;c<chs;c++){
+    const arr=outChs[c];
+    for(let i=0;i<len;i++) arr[i]*=norm;
+    outBuf.copyToChannel(arr,c);
+  }
+  return outBuf;
+}
+
+/* ============ WAV 与文件输出 ============ */
+function encodeWav(buffer){
+  const numCh=buffer.numberOfChannels, sr=buffer.sampleRate, len=buffer.length;
+  const blockAlign=numCh*2, dataSize=len*blockAlign;
+  const ab=new ArrayBuffer(44+dataSize), v=new DataView(ab);
+  const wstr=(off,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(off+i,s.charCodeAt(i)); };
+  wstr(0,"RIFF"); v.setUint32(4,36+dataSize,true); wstr(8,"WAVE");
+  wstr(12,"fmt "); v.setUint32(16,16,true); v.setUint16(20,1,true);
+  v.setUint16(22,numCh,true); v.setUint32(24,sr,true);
+  v.setUint32(28,sr*blockAlign,true); v.setUint16(32,blockAlign,true); v.setUint16(34,16,true);
+  wstr(36,"data"); v.setUint32(40,dataSize,true);
+  const chData=[]; for(let c=0;c<numCh;c++) chData.push(buffer.getChannelData(c));
+  let off=44;
+  for(let i=0;i<len;i++) for(let c=0;c<numCh;c++){
+    let s=chData[c][i]; s=s<-1?-1:s>1?1:s;
+    v.setInt16(off, s<0?s*0x8000:s*0x7FFF, true); off+=2;
+  }
+  return new Blob([ab],{type:"audio/wav"});
+}
+function downloadBlob(blob, filename){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
+}
+function shareableFile(blob, name){
+  try{ return new File([blob], name, {type:"audio/wav"}); }catch(e){ return null; }
+}
+function canShareWav(file){
+  if(!file || !ENV.shareApi) return false;
+  try{ return !!navigator.canShare({files:[file]}); }catch(e){ return false; }
+}
+async function shareWav(blob, name){
+  const file = shareableFile(blob, name);
+  if(!canShareWav(file)) throw new Error("当前浏览器不支持分享文件");
+  /* 必须在点击手势链路里第一个调用，否则手机会报 NotAllowedError */
+  await navigator.share({files:[file], title:"Gamma Pulse: 40Hz调幅音乐", text:name});
+}
+/* 单声道 22.05kHz 线性插值重采样：长歌省内存、文件更小 */
+function phoneFriendlyWav(buffer){
+  const targetSr=22050;
+  if(buffer.numberOfChannels===1 && buffer.sampleRate===targetSr) return buffer;
+  const ratio=targetSr/buffer.sampleRate, len=Math.max(1,Math.floor(buffer.length*ratio));
+  const out=getCtx().createBuffer(1,len,targetSr), d=out.getChannelData(0), chs=[];
+  for(let c=0;c<buffer.numberOfChannels;c++) chs.push(buffer.getChannelData(c));
+  for(let i=0;i<len;i++){
+    const pos=i/ratio, i0=Math.floor(pos), fr=pos-i0;
+    let s=0;
+    for(const ch of chs){
+      const a=ch[Math.min(i0,ch.length-1)], b=ch[Math.min(i0+1,ch.length-1)];
+      s += a+(b-a)*fr;
+    }
+    d[i]=s/chs.length;
+  }
+  return out;
+}
+/* 兼容只支持回调式的老浏览器 */
+function decodeArrayBuffer(ab){
+  const ctx = getCtx();
+  return new Promise((resolve,reject) => {
+    let done=false;
+    const ok=b=>{ if(!done){done=true;resolve(b);} };
+    const bad=e=>{ if(!done){done=true;reject(e||new Error("解码失败"));} };
+    try{
+      const p=ctx.decodeAudioData(ab,ok,bad);
+      if(p && typeof p.then==="function") p.then(ok,bad);
+    }catch(e){ bad(e); }
+  });
+}
+
+/* ============ 省内存模式 ============ */
+const LITE_KEY="am40_lite_mode_v1";
+let liteMode = ENV.mobile;
+try{ const v=localStorage.getItem(LITE_KEY); if(v!==null) liteMode=(v==="1"); }catch(e){}
+function renderLiteHint(){
+  $("liteHint").textContent = liteMode
+    ? "已开启：长歌不卡、文件更小（40Hz 包络完整保留）。"
+    : "完整音质（立体声 / 原采样率）。";
+}
+$("liteMode").checked = liteMode;
+renderLiteHint();
+$("liteMode").onchange = () => {
+  liteMode = $("liteMode").checked;
+  try{ localStorage.setItem(LITE_KEY, liteMode?"1":"0"); }catch(e){}
+  renderLiteHint();
+  if(currentFile) loadFile(currentFile);
+};
+
+/* ============ 设备适配：应用内浏览器提示与分享按钮 ============ */
+let LIB_SHARE=false;   /* 歌库行内「📤 分享」是否可用（应用内浏览器、夸克都调不起来，直接不给按钮） */
+let LIB_DL=true;       /* 歌库行内「⬇ 下载」是否显示（微信里存不进手机，直接不给按钮） */
+const HIDE_EXPORT = ENV.wechat;   /* 微信里导出/下载存不进手机，直接不给这些按钮 */
+(function initEnv(){
+  const probe = shareableFile(new Blob([new Uint8Array(1)],{type:"audio/wav"}), "t.wav");
+  LIB_SHARE = !ENV.inapp && !ENV.quark && canShareWav(probe);
+  LIB_DL = !HIDE_EXPORT;
+  if(ENV.inapp){
+    const n = ENV.inappName || "内置浏览器";
+    $("inappBar").innerHTML = "💡 你正在【"+n+"】里打开。<b>选歌通常可用</b>；"+
+      "若选完提示读取失败，请换 Chrome 或夸克浏览器打开本页，或点右上角「···」→「在浏览器打开」再试。";
+    $("inappBar").classList.remove("hidden");
+  }
+  /* 系统分享：应用内浏览器、夸克都不给；其余浏览器按 API 支持情况决定 */
+  const shareOK = !ENV.inapp && !ENV.quark && canShareWav(probe);
+  $("shareMod").classList.toggle("hidden", !shareOK);
+  /* 微信里导出 WAV 点了也存不下来 → 隐藏按钮，改走「存入歌库 + 复制链接到系统浏览器」 */
+  if(HIDE_EXPORT){
+    $("dlMod").classList.add("hidden");
+    $("dlMod").disabled = true;
+  }
+  if(IS_ANDROID && !ENV.wechat){
+    $("uploadDiag").textContent = "选好歌后自动生成调制版，可一次多选。若提示读取失败，请用夸克浏览器打开本页（已实测可用）。";
+  }
+})();
+$("copyLink").onclick = e => {
+  const b=e.currentTarget, old=b.textContent;
+  copyText(pageUrl());
+  b.textContent="✅ 已复制"; setTimeout(()=>b.textContent=old,1500);
+};
+
+/* ============ 选歌与处理 ============ */
+let origBuffer=null, modBuffer=null, currentFile=null, sourceName="";
+const dz=$("dropzone");
+dz.ondragover = e => { e.preventDefault(); dz.classList.add("drag"); };
+dz.ondragleave = () => dz.classList.remove("drag");
+dz.ondrop = e => { e.preventDefault(); dz.classList.remove("drag");
+  if(e.dataTransfer.files.length) loadFiles(e.dataTransfer.files); };
+/* 用原生 label[for] 关联打开文件框：安卓自带浏览器对「JS 程序化 .click() 文件框」常出现
+   “能选、但结果绑不回 input、拿到空文件”，原生关联最可靠；这里只负责在用户手势里启动音频引擎。 */
+dz.addEventListener("click", () => { try{ getCtx(); }catch(e){} });
+/* input 本身是可见按钮，两个入口都受此监听；选中后直接加载 */
+document.querySelectorAll("input[data-song]").forEach(inp => {
+  inp.addEventListener("change", () => {
+    if(inp.files && inp.files.length){
+      try{ getCtx(); }catch(e){}   /* 在用户手势里先启动音频引擎 */
+      loadFiles(inp.files);
+      setTimeout(()=>{ try{ inp.value=""; }catch(e){} },150);
+    }
+  });
+});
+(function(){
+  const miss=[];
+  if(!window.FileReader) miss.push("读取本地文件");
+  if(!AC) miss.push("音频解码");
+  if(miss.length){
+    $("uploadDiag").textContent = "⚠️ 当前浏览器不支持"+miss.join(" / ")+"，请用 Safari 或系统自带浏览器打开本页。";
+    $("uploadDiag").style.color = "#c0392b";
+  }
+})();
+
+function loadFile(file){
+  if(!file) return;
+  /* 先真读，读到内容就处理；FileReader 失败时再用 arrayBuffer / objectURL+fetch 兜底
+     （不同 WebView 对 content:// 的读取实现不一致，多试几条路能救回一部分机型） */
+  currentFile=file;
+  $("songStatus").textContent = "📂 已选到《"+(file.name||"音频")+"》"+(file.size?("（"+fmtSize(file.size)+"）"):"")+"，正在读取…";
+  userStop();
+  origBuffer=null; modBuffer=null; sourceName=file.name||"audio";
+  $("playOrig").disabled=true; $("playMod").disabled=true;
+  $("saveLib").disabled=true; $("dlMod").disabled=true;
+  if(!AC){ $("songStatus").textContent="❌ 这个浏览器不支持音频处理，请换个浏览器打开本页"; return; }
+  let done=false;
+  const watchdog=setTimeout(()=>{
+    if(!done) $("songStatus").textContent="⏳ 解码有点久…可换 mp3 / wav，或用下方备用按钮重选一次";
+  },12000);
+  const showErr=msg=>{ if(done)return; done=true; clearTimeout(watchdog); $("songStatus").textContent="❌ "+msg; };
+  /* 只有在「真的读不出内容」时才给指引，且按当前环境给最省事的一步 */
+  const failRead=why=>{
+    let tip;
+    if(ENV.wechat) tip="在微信里点右上角「···」→「在浏览器打开」，再重新选歌即可";
+    else if(IS_ANDROID) tip="这个浏览器拿不到文件内容。请改用夸克浏览器打开本页再选歌（已实测可用），或在微信里直接打开本页";
+    else if(ENV.inapp) tip="请用夸克浏览器打开本页再选歌（已实测可用）；或点右上角菜单 →「在浏览器打开」";
+    else tip="请换一个浏览器（Chrome / Edge / Firefox）打开本页后再选歌，或点上方「📋 复制本页链接」";
+    showErr("浏览器没能读取你选的文件"+(why?("（"+why+"）"):"")+"。"+tip);
+  };
+  const handleBuffer=ab=>{
+    if(done) return;
+    if(!ab || ab.byteLength===0){ failRead("文件内容为空"); return; }
+    decodeArrayBuffer(ab).then(buf => {
+      if(done) return;
+      try{
+        if(liteMode) buf=liteBuffer(buf);
+        origBuffer=buf;
+        $("origDur").textContent=fmtDur(buf.duration)+" · "+buf.sampleRate+"Hz"+(liteMode?" · 省内存":"");
+        drawWave($("waveOrig"),buf,null);
+        $("playOrig").disabled=false;
+        $("songStatus").textContent="已加载《"+(file.name||"音频")+"》，正在生成调制版…";
+        done=true; clearTimeout(watchdog);
+        setTimeout(rendMod,30);
+      }catch(err){ showErr("处理音频时出错："+err.message); }
+    }).catch(err => showErr("解码失败："+((err&&err.message)?err.message:"这个格式读不了")+"。请换 mp3 / wav / m4a 再试"));
+  };
+  if(window.FileReader){
+    const fr=new FileReader();
+    fr.onload=()=>handleBuffer(fr.result);
+    fr.onerror=async()=>{ const ab=await readFileBytes(file); if(ab) handleBuffer(ab); else failRead("浏览器拒绝读取"); };
+    try{ fr.readAsArrayBuffer(file); }catch(e){ readFileBytes(file).then(ab=>{ if(ab) handleBuffer(ab); else failRead(e && e.message); }); }
+  }else{
+    readFileBytes(file).then(ab=>{ if(ab) handleBuffer(ab); else failRead("浏览器不支持读取文件"); });
+  }
+}
+
+/* 把文件读成 ArrayBuffer：多路兜底（arrayBuffer → objectURL+fetch → FileReader），单首加载与批量导入共用 */
+async function readFileBytes(file){
+  try{ if(file.arrayBuffer){ const ab=await file.arrayBuffer(); if(ab && ab.byteLength) return ab; } }catch(e){}
+  try{
+    const u=URL.createObjectURL(file);
+    try{ const ab=await (await fetch(u)).arrayBuffer(); if(ab && ab.byteLength) return ab; }
+    finally{ try{ URL.revokeObjectURL(u); }catch(e){} }
+  }catch(e){}
+  if(window.FileReader){
+    try{
+      const ab=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsArrayBuffer(file); });
+      if(ab && ab.byteLength) return ab;
+    }catch(e){}
+  }
+  return null;
+}
+
+/* 多选处理：1 首走正常预览流程；多首则逐首 读取→解码→调制→存入歌库（不打断当前预览） */
+async function loadFiles(files){
+  const list=Array.from(files||[]).filter(Boolean);
+  if(!list.length) return;
+  if(list.length===1){ loadFile(list[0]); return; }
+  const fMod=parseFloat($("fMod").value), pct=parseFloat($("depth").value), depth=pct/100;
+  const tag=fMod+"Hz / "+pct+"%";
+  let ok=0; const failed=[];
+  for(let i=0;i<list.length;i++){
+    const f=list[i];
+    $("songStatus").textContent="📦 批量导入 "+(i+1)+"/"+list.length+"：《"+(f.name||"音频")+"》…";
+    try{
+      const ab=await readFileBytes(f);
+      if(!ab || ab.byteLength===0) throw new Error("读不到文件内容");
+      let buf=await decodeArrayBuffer(ab);
+      if(liteMode) buf=liteBuffer(buf);
+      const blob=encodeWav(modulateBuffer(buf, fMod, depth));
+      const base=(f.name||("track"+(i+1))).replace(/\.[^.]+$/,"");
+      await addToLibrary(base+"_"+fMod+"Hz_"+pct+"pct.wav", blob, tag, f.name||("track"+(i+1)));
+      ok++;
+    }catch(err){ failed.push((f.name||"未知")+("（"+((err&&err.message)||"读取失败")+"）")); }
+  }
+  $("songStatus").textContent = failed.length
+    ? "📦 批量导入完成：成功 "+ok+" 首，失败 "+failed.length+" 首 → "+failed.join("；")
+    : "📦 批量导入完成：成功 "+ok+" 首，已存入歌库";
+}
+
+/* ============ 选歌篮已按需求移除：选完直接处理（1 首进预览，多首批量入库） ============ */
+function liteBuffer(buf){ return phoneFriendlyWav(buf); }
+
+function rendMod(){
+  if(!origBuffer) return;
+  $("songStatus").textContent="计算中…";
+  setTimeout(()=>{
+    try{
+      const fMod=parseFloat($("fMod").value), depth=parseFloat($("depth").value)/100;
+      modBuffer=modulateBuffer(origBuffer,fMod,depth);
+      $("modDur").textContent=fmtDur(modBuffer.duration)+" · "+modBuffer.sampleRate+"Hz";
+      drawWave($("waveMod"),modBuffer,null);
+      $("playMod").disabled=false; $("saveLib").disabled=false;
+      if(!HIDE_EXPORT) $("dlMod").disabled=false;
+      $("songStatus").textContent="✅ 完成（"+fMod+"Hz / 深度 "+parseFloat($("depth").value)+"%）"+
+        (HIDE_EXPORT ? "。微信里不能导出文件：可先「💾 存入歌库」试听，要导出请点「📋 复制本页链接」到系统浏览器打开" : "");
+    }catch(err){ $("songStatus").textContent="❌ 处理失败："+err.message; }
+  },30);
+}
+function defaultName(){
+  const base=sourceName ? sourceName.replace(/\.[^.]+$/,"") : "40Hz_modulated";
+  return base+"_"+$("fMod").value+"Hz_"+parseFloat($("depth").value)+"pct.wav";
+}
+$("playOrig").onclick = () => {
+  if(!origBuffer) return;
+  const willStop=!!(cur&&cur.src&&cur.buffer===origBuffer);
+  togglePlay(origBuffer,$("waveOrig"),$("playOrig"),"▶ 试听原曲");
+  $("songStatus").textContent = willStop ? "⏹ 已停止" : "🔊 正在播放原曲";
+};
+$("playMod").onclick = () => {
+  if(!modBuffer) return;
+  const willStop=!!(cur&&cur.src&&cur.buffer===modBuffer);
+  togglePlay(modBuffer,$("waveMod"),$("playMod"),"▶ 试听调制版");
+  $("songStatus").textContent = willStop ? "⏹ 已停止" : "🔊 正在播放调制版";
+};
+
+/* ============ 本机歌库（默认 20 首，可切不限量） ============ */
+const LMODE_KEY="am40_lib_mode_v1";
+let libMode="20";
+try{ libMode=localStorage.getItem(LMODE_KEY)||"20"; }catch(e){}
+let library=[];
+const LIB_DB="am40_library_db", LIB_STORE="tracks";
+function openLibDB(){
+  return new Promise((resolve,reject)=>{
+    if(!window.indexedDB){ reject(new Error("IndexedDB 不可用")); return; }
+    const req=indexedDB.open(LIB_DB,1);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(LIB_STORE)) db.createObjectStore(LIB_STORE,{keyPath:"id"});
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function libPut(item){
+  const db=await openLibDB();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(LIB_STORE,"readwrite");
+    tx.objectStore(LIB_STORE).put({id:item.id,name:item.name,sourceName:item.sourceName,
+      time:item.time,meta:item.meta,size:item.size,blob:item.blob,ts:item.ts});
+    tx.oncomplete=()=>{db.close();res();}; tx.onerror=()=>{db.close();rej(tx.error);};
+  });
+}
+async function libDel(id){
+  try{
+    const db=await openLibDB();
+    await new Promise((res,rej)=>{
+      const tx=db.transaction(LIB_STORE,"readwrite");
+      tx.objectStore(LIB_STORE).delete(id);
+      tx.oncomplete=()=>{db.close();res();}; tx.onerror=()=>{db.close();rej(tx.error);};
+    });
+  }catch(e){}
+}
+async function libAll(){
+  const db=await openLibDB();
+  return await new Promise((res,rej)=>{
+    const tx=db.transaction(LIB_STORE,"readonly"), rq=tx.objectStore(LIB_STORE).getAll();
+    rq.onsuccess=()=>{db.close();res(rq.result||[]);}; rq.onerror=()=>{db.close();rej(rq.error);};
+  });
+}
+function libMeta(){ return $("fMod").value+"Hz / "+parseFloat($("depth").value)+"%"; }
+async function addToLibrary(name, blob, meta, srcName){
+  const item={id:"t"+Date.now()+"_"+Math.random().toString(36).slice(2,7),
+    name,blob,meta,sourceName:srcName||sourceName||"",time:new Date().toLocaleString("zh-CN"),
+    size:fmtSize(blob.size),ts:Date.now(),buffer:null};
+  library.unshift(item);
+  if(libMode==="20"){
+    try{ await libPut(item); }catch(e){ $("libStatus").textContent="⚠️ 本地存储不可用，本首仅保留在内存中"; }
+    await trimLibrary();
+  }else{
+    $("libStatus").textContent="💾 内存模式：已保存，刷新后清空";
+  }
+  renderLibrary();
+  return item;
+}
+async function trimLibrary(){
+  if(libMode!=="20") return;
+  while(library.length>20){ const old=library.pop(); await libDel(old.id); }
+}
+function renderLibrary(){
+  $("libCount").textContent = library.length+" 首"+(libMode==="20"?" / 上限 20":" / 不限制");
+  const box=$("libraryBody");
+  if(!library.length){
+    box.innerHTML='<div class="empty">还没有歌。选歌后点「💾 存入歌库」'+(HIDE_EXPORT?'':'或「⬇ 导出 WAV」')+'即可。</div>';
+    return;
+  }
+  box.innerHTML=library.map(it=>`
+    <div class="librow" data-row="${it.id}">
+      <div class="libplay"><button type="button" class="btn primary tiny" data-play="${it.id}">▶ 试听</button></div>
+      <div class="libbody">
+        <div class="libtitle">${esc(it.name)}<span class="tag">${esc(it.meta||"")}</span></div>
+        <div class="libmeta">${esc(it.sourceName||"")} · ${esc(it.time||"")} · ${esc(it.size||"")}</div>
+        <div class="prog"><div class="progfill" data-prog="${it.id}"></div></div>
+      </div>
+      <div class="libacts">
+        ${LIB_SHARE?'<button type="button" class="btn ghost tiny" data-share="'+it.id+'">📤 分享</button>':''}
+        ${LIB_DL?'<button type="button" class="btn ghost tiny" data-dl="'+it.id+'">⬇ 下载</button>':''}
+        <button type="button" class="btn ghost tiny" data-rm="${it.id}">删除</button>
+      </div>
+    </div>`).join("");
+  syncLibButtons();
+}
+async function playLibraryItem(it, opts, stillValid){
+  let buf=it.buffer;
+  if(!buf){
+    try{ buf=await decodeArrayBuffer(await it.blob.arrayBuffer()); it.buffer=buf; }
+    catch(e){
+      if(!opts || !opts.silent) $("libStatus").textContent="❌ 无法播放："+e.message;
+      return false;
+    }
+  }
+  if(stillValid && !stillValid()) return false;   /* 解码期间用户已停止 */
+  playBuffer(buf,null,null,null,it.id,opts);
+  return true;
+}
+async function playLibrary(id){
+  const it=library.find(x=>x.id===id);
+  if(!it) return;
+  if(cur && cur.libId===id){ userStop(); $("libStatus").textContent="⏹ 已停止"; return; }
+  stopPlayAll();
+  if(await playLibraryItem(it)) $("libStatus").textContent="🔊 正在播放："+it.name;
+}
+/* 一键播放全部：按歌库顺序连播，一首结束自动接下一首 */
+async function playAllNext(){
+  const pa=playAll;
+  if(!pa) return;
+  let idx=pa.index+1;
+  while(idx<pa.ids.length && !library.some(x=>x.id===pa.ids[idx])) idx++;
+  if(idx>=pa.ids.length){
+    const total=pa.ids.length;
+    stopPlayAll();
+    $("libStatus").textContent="✅ 播放完毕（"+total+" 首）";
+    return;
+  }
+  pa.index=idx;
+  const it=library.find(x=>x.id===pa.ids[idx]);
+  const ok=await playLibraryItem(it,{onEnded:playAllNext,silent:true},()=>playAll===pa);
+  if(playAll!==pa) return;
+  if(!ok){ $("libStatus").textContent="⏭ 跳过："+it.name; return playAllNext(); }
+  $("libStatus").textContent="🔊 连播 "+(idx+1)+"/"+pa.ids.length+"："+it.name;
+}
+$("libPlayAll").onclick = async () => {
+  if(playAll){ userStop(); $("libStatus").textContent="⏹ 已停止连播"; return; }
+  if(!library.length){ $("libStatus").textContent="歌库是空的，先存几首歌"; return; }
+  playAll={ids:library.map(x=>x.id),index:-1};
+  const b=$("libPlayAll"); b.textContent="⏹ 停止连播"; b.classList.add("green");
+  await playAllNext();
+};
+$("libraryBody").addEventListener("click", async e => {
+  const b=e.target.closest("button[data-play],button[data-dl],button[data-rm],button[data-share]");
+  if(!b) return;
+  const id=b.dataset.play||b.dataset.dl||b.dataset.rm||b.dataset.share;
+  const it=library.find(x=>x.id===id);
+  if(!it) return;
+  if(b.dataset.play!==undefined) await playLibrary(id);
+  else if(b.dataset.share!==undefined) shareLibraryItem(it);
+  else if(b.dataset.dl!==undefined){ downloadBlob(it.blob,it.name); $("libStatus").textContent="⬇ 已下载："+it.name; }
+  else{
+    library=library.filter(x=>x.id!==id);
+    await libDel(id);
+    if(cur&&cur.libId===id) userStop();
+    renderLibrary(); $("libStatus").textContent="🗑 已删除："+it.name;
+  }
+});
+/* 歌库行内分享：微信里选「微信」发给朋友；夸克里选「夸克网盘」传进网盘（再做网盘分享链接，朋友即可在线听） */
+function shareLibraryItem(it){
+  if(!canShareWav(shareableFile(it.blob, it.name))){
+    downloadBlob(it.blob, it.name);
+    $("libStatus").textContent="⬇ 当前浏览器不支持分享，已下载："+it.name+"。发朋友可去微信聊天 → ＋ → 文件 里选它";
+    return;
+  }
+  $("libStatus").textContent="📤 正在调起分享面板…若等两三秒仍没有弹出，请用该行的「⬇ 下载」存到手机再发";
+  navigator.share({files:[shareableFile(it.blob, it.name)], title:it.name})
+    .then(()=>{
+      $("libStatus").textContent="📤 已调起分享面板："+it.name+"。微信里选「微信」发给朋友；夸克里选「夸克网盘」存进网盘（再做网盘分享，朋友即可在线听）";
+    })
+    .catch(err=>{
+      if(err && err.name==="AbortError"){ $("libStatus").textContent="⏹ 已取消分享"; return; }
+      downloadBlob(it.blob, it.name);
+      $("libStatus").textContent="⬇ 分享不可用，已下载："+it.name+"。发朋友可去微信聊天 → ＋ → 文件 里选它";
+    });
+}
+$("saveLib").onclick = async () => {
+  if(!modBuffer) return;
+  const name=defaultName();
+  try{
+    await addToLibrary(name, encodeWav(modBuffer), libMeta(), sourceName);
+    $("songStatus").textContent="💾 已存入歌库："+name;
+  }catch(e){ $("songStatus").textContent="❌ 保存失败："+e.message; }
+};
+document.querySelectorAll('input[name="libMode"]').forEach(r => {
+  r.checked=(r.value===libMode);
+  r.addEventListener("change", async () => {
+    libMode=r.value;
+    try{ localStorage.setItem(LMODE_KEY,libMode); }catch(e){}
+    if(libMode==="20"){
+      for(const it of library.slice(0,20)){ try{ await libPut(it); }catch(e){} }
+      await trimLibrary();
+    }
+    renderLibrary();
+    $("libStatus").textContent = libMode==="20" ? "✅ 最多 20 首，刷新后仍在" : "✅ 不限数量，刷新后清空";
+  });
+});
+$("libStopAll").onclick = () => { userStop(); $("libStatus").textContent="⏹ 已停止播放"; };
+$("libClear").onclick = async () => {
+  if(!library.length){ $("libStatus").textContent="歌库本来就是空的"; return; }
+  if(confirm("清空本机歌库？")){
+    userStop();
+    for(const it of library) await libDel(it.id);
+    library=[]; renderLibrary(); $("libStatus").textContent="🗑 歌库已清空";
+  }
+};
+(async()=>{
+  try{
+    const saved=await libAll();
+    library=saved.map(x=>Object.assign({},x,{buffer:null})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    await trimLibrary();
+  }catch(e){}
+  renderLibrary();
+})();
+
+/* ============ 导出 ============ */
+async function doExport(mode){
+  if(!modBuffer){ $("songStatus").textContent="⚠️ 请先选歌并等调制完成"; return; }
+  const name=defaultName().replace(/[\\/:*?"<>|]/g,"_");
+  let blob;
+  try{ blob=encodeWav(modBuffer); }catch(err){ $("songStatus").textContent="❌ 导出失败："+err.message; return; }
+
+  if(mode==="share"){
+    if(canShareWav(shareableFile(blob,name))){
+      $("songStatus").textContent="📤 正在调起系统分享面板…若等两三秒仍没有任何弹出，请改点「⬇ 导出 WAV」把文件存到手机，再从微信/夸克里发送";
+      try{
+        await shareWav(blob,name);   /* 第一个 await，保持在点击手势内 */
+        $("songStatus").textContent="📤 已调起分享面板："+name+"。选「微信」→ 选朋友/文件传输助手；或选「夸克网盘」存进网盘后再建分享链接给朋友";
+      }catch(err){
+        if(err && err.name==="AbortError"){ $("songStatus").textContent="⏹ 已取消分享，未保存"; return; }
+        downloadBlob(blob,name);
+        $("songStatus").textContent="⬇ 这个浏览器的分享面板调不起来，文件已下载。发朋友：微信聊天 → ＋ → 文件，从「下载」目录选它";
+      }
+    }else mode="download";
+  }
+  if(mode==="download"){
+    if(ENV.inapp){
+      $("songStatus").textContent="⚠️ "+ (ENV.inappName||"应用内") +"浏览器无法保存文件，已先存进本机歌库；点上方「📋 复制本页链接」，到手机自带浏览器打开后再导出。";
+    }else{
+      downloadBlob(blob,name);
+      $("songStatus").textContent="⬇ 已导出："+name+"。发朋友：打开微信聊天 → 点 ＋ → 文件 → 从「下载」目录选它发送";
+    }
+  }
+  try{ await addToLibrary(name, blob, libMeta(), sourceName); }
+  catch(e){ $("songStatus").textContent += "（歌库保存失败："+e.message+"）"; }
+}
+$("dlMod").onclick = () => doExport("download");
+$("shareMod").onclick = () => doExport("share");
+</script>
+</body>
+</html>
