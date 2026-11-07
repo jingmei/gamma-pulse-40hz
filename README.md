@@ -4,6 +4,12 @@
 
 > 🔬 背景小知识：MIT 蔡立慧（Li-Huei Tsai）实验室 2016 年发表于 *Nature* 的小鼠实验显示，40Hz 光/声刺激可诱发大脑伽马振荡、降低 Aβ 水平、激活小胶质细胞（详见文末参考文献）。本工具把 40Hz 调幅作为一种音频制作参数呈现，仅供专注 / 放松 / 娱乐使用，**不构成医疗建议**。
 
+## 🔗 链接
+
+- **在线使用（手机浏览器打开体验最佳）**：https://40hz-am-studio.app.workbuddy.host/?sharecode=AZPGUTR6SW
+- **GitHub**：https://github.com/jingmei/gamma-pulse-40hz
+- **Gitee（国内访问快）**：https://gitee.com/respectfully-mei/gamma-pulse-40hz
+
 ## ✨ 功能
 
 - **本地处理**：选歌 → 实时 40Hz 调制 → 试听 → 导出 WAV / 存入歌库，全程在浏览器完成，无服务器、无上传、无登录
